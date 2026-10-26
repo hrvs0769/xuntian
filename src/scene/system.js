@@ -174,12 +174,12 @@ export async function buildSystem(scene) {
 
   // ── 贴图 ──
   const [earthDay, earthNight, earthSpec, earthNorm, earthClouds, moonTex] = await Promise.all([
-    loadTex('/tex/earth_day_4096.jpg'),
-    loadTex('/tex/earth_night_4096.jpg'),
-    loadTex('/tex/earth_specular_2048.jpg'),
-    loadTex('/tex/earth_normal_2048.jpg', { srgb: false }),
+    loadTex('/tex/earth_day_4096.webp'),
+    loadTex('/tex/earth_night_4096.webp'),
+    loadTex('/tex/earth_specular_2048.webp'),
+    loadTex('/tex/earth_normal_2048.webp', { srgb: false }),
     loadTex('/tex/earth_clouds_1024.png'),
-    loadTex('/tex/moon_4k.jpg'),
+    loadTex('/tex/moon_4k.webp'),
   ]);
 
   const texCache = new Map();
@@ -351,7 +351,7 @@ export async function buildSystem(scene) {
     group.add(tilt);
 
     // 法线贴图跟着球面细分一起提：1024 宽在 2.6R 处每个 texel 已经跨好几个像素
-    const moonNormal = moonTex ? await makeNormalMap('/tex/moon_4k.jpg', { width: 2048, strength: 1.1 }) : null;
+    const moonNormal = moonTex ? await makeNormalMap('/tex/moon_4k.webp', { width: 2048, strength: 1.1 }) : null;
     const mat = makeSurfaceMaterial({
       map: moonTex,
       normalMap: moonNormal,
