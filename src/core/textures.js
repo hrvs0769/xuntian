@@ -18,11 +18,32 @@ function resolve(p) {
   return b + p.replace(/^\//, '');
 }
 
-export function loadTex(url, { srgb = true, aniso = 8 } = {}) {
+// 低清层路径：/tex/xxx.webp → /tex/lo/xxx.webp
+// 云层原本是 PNG，但低清层统一编码成 WebP（512 宽时带 alpha 的 WebP 更小）。
+function loPath(url) {
+  const p = url.split('?')[0];
+  const i = p.lastIndexOf('/');
+  const dir = p.slice(0, i + 1);
+  const file = p.slice(i + 1).replace(/\.(png|jpe?g)$/i, '.webp');
+  return dir + 'lo/' + file;
+}
+
+/**
+ * 加载贴图。
+ *
+ * lo: true 时先取 /tex/lo/ 下的 512 宽版本，并把高清地址记在 texture.userData.hiUrl 上，
+ * 之后由 upgradeRoot() 在后台换成高清。
+ *
+ * 为什么要分级：github.io 对国内单连接限速约 46KB/s，3.35MB 要 70 秒。
+ * 但全景时所有行星都只有几个像素，512 宽绰绰有余——
+ * 高清贴图只在"镜头真的推到某颗星球上"时才有意义。
+ */
+export function loadTex(url, { srgb = true, aniso = 8, lo = false } = {}) {
   progress.total++;
+  const real = lo ? loPath(url) : url;
   return new Promise((done) => {
     loader.load(
-      resolve(url),
+      resolve(real),
       (tex) => {
         tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
         tex.anisotropy = aniso;
@@ -30,6 +51,8 @@ export function loadTex(url, { srgb = true, aniso = 8 } = {}) {
         tex.wrapT = THREE.ClampToEdgeWrapping;
         tex.minFilter = THREE.LinearMipmapLinearFilter;
         tex.magFilter = THREE.LinearFilter;
+        // 只有低清版本才需要记住高清地址
+        if (lo) tex.userData.hiUrl = url;
         progress.loaded++;
         done(tex);
       },
@@ -37,6 +60,82 @@ export function loadTex(url, { srgb = true, aniso = 8 } = {}) {
       () => { progress.loaded++; done(null); }
     );
   });
+}
+
+/** 把材质里所有指向 oldTex 的贴图槽换成 newTex（含 uniforms） */
+export function swapTex(mat, oldTex, newTex) {
+  let hit = false;
+  for (const k of Object.keys(mat)) {
+    if (mat[k] === oldTex) { mat[k] = newTex; hit = true; }
+  }
+  if (mat.uniforms) {
+    for (const k of Object.keys(mat.uniforms)) {
+      if (mat.uniforms[k] && mat.uniforms[k].value === oldTex) {
+        mat.uniforms[k].value = newTex;
+        hit = true;
+      }
+    }
+  }
+  if (hit) mat.needsUpdate = true;
+  return hit;
+}
+
+/**
+ * 把一棵子树里的低清贴图逐个换成高清。
+ *
+ * 串行而不是并发：这些请求和用户接下来的操作抢同一条带宽，
+ * 一次一个反而不会让"点开某颗行星"卡住。
+ */
+export async function upgradeRoot(root, { onStep } = {}) {
+  // 先收集，边遍历边替换会打乱 traverse
+  const jobs = [];
+  root.traverse((o) => {
+    const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+    for (const mat of mats) {
+      if (mat.userData && mat.userData.upgraded) continue;
+      const seen = new Set();
+      const collect = (t) => {
+        if (t && t.isTexture && t.userData && t.userData.hiUrl && !seen.has(t)) {
+          seen.add(t);
+          jobs.push({ mat, tex: t });
+        }
+      };
+      for (const k of Object.keys(mat)) collect(mat[k]);
+      if (mat.uniforms) for (const k of Object.keys(mat.uniforms)) collect(mat.uniforms[k].value);
+    }
+  });
+
+  for (const { mat, tex } of jobs) {
+    const hi = await loadTex(tex.userData.hiUrl, {
+      srgb: tex.colorSpace === THREE.SRGBColorSpace,
+      aniso: tex.anisotropy,
+    });
+    if (!hi) continue;
+    swapTex(mat, tex, hi);
+    tex.dispose();
+    if (onStep) onStep();
+  }
+
+  // 法线贴图是从反照率实时算的，换了高清反照率之后要重算一遍
+  const normals = [];
+  root.traverse((o) => {
+    const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+    for (const mat of mats) {
+      if (mat.userData && mat.userData.normalSrc) normals.push(mat);
+    }
+  });
+  for (const mat of normals) {
+    const { width, strength } = mat.userData.normalSrc;
+    // 用升级后的反照率重算（此时 uMap 已经是高清版本）
+    const src = (mat.uniforms && mat.uniforms.uMap && mat.uniforms.uMap.value) || mat.map;
+    if (!src || !src.image) continue;
+    const n = await makeNormalMap(src, { width, strength });
+    if (!n) continue;
+    const old = mat.uniforms && mat.uniforms.uNormal ? mat.uniforms.uNormal.value : null;
+    if (old) swapTex(mat, old, n);
+    else swapTex(mat, mat.normalMap, n);
+    if (old) old.dispose();
+  }
 }
 
 function loadImage(url) {
@@ -50,14 +149,17 @@ function loadImage(url) {
 }
 
 /** 由反照率亮度生成法线贴图（岩质天体的浮雕感） */
-export async function makeNormalMap(url, { width = 1024, strength = 2.2 } = {}) {
-  const img = await loadImage(url);
+export async function makeNormalMap(source, { width = 1024, strength = 2.2 } = {}) {
+  // source 可以是 url、HTMLImageElement，或已经加载好的 THREE.Texture。
+  // 传 texture 时会复用它的 image——否则同一张 moon_4k 会被下载两遍。
+  const img = source && source.image ? source.image
+    : (typeof source === 'string' ? await loadImage(source) : source);
   if (!img) return null;
   const w = width, h = Math.round(width / 2);
 
-  const src = document.createElement('canvas');
-  src.width = w; src.height = h;
-  const sctx = src.getContext('2d', { willReadFrequently: true });
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const sctx = cv.getContext('2d', { willReadFrequently: true });
   sctx.drawImage(img, 0, 0, w, h);
   const sd = sctx.getImageData(0, 0, w, h).data;
 

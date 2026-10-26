@@ -173,18 +173,20 @@ export async function buildSystem(scene) {
   });
 
   // ── 贴图 ──
+  // 全部先取低清层（512 宽，13 张合计约 200KB）。
+  // 高清由 upgradeRoot() 在首屏出来之后按优先级补。
   const [earthDay, earthNight, earthSpec, earthNorm, earthClouds, moonTex] = await Promise.all([
-    loadTex('/tex/earth_day_4096.webp'),
-    loadTex('/tex/earth_night_4096.webp'),
-    loadTex('/tex/earth_specular_2048.webp'),
-    loadTex('/tex/earth_normal_2048.webp', { srgb: false }),
-    loadTex('/tex/earth_clouds_1024.png'),
-    loadTex('/tex/moon_4k.webp'),
+    loadTex('/tex/earth_day_4096.webp', { lo: true }),
+    loadTex('/tex/earth_night_4096.webp', { lo: true }),
+    loadTex('/tex/earth_specular_2048.webp', { lo: true }),
+    loadTex('/tex/earth_normal_2048.webp', { srgb: false, lo: true }),
+    loadTex('/tex/earth_clouds_1024.png', { lo: true }),
+    loadTex('/tex/moon_4k.webp', { lo: true }),
   ]);
 
   const texCache = new Map();
   const loadBodyTex = async (file) => {
-    if (!texCache.has(file)) texCache.set(file, await loadTex('/tex/' + file));
+    if (!texCache.has(file)) texCache.set(file, await loadTex('/tex/' + file, { lo: true }));
     return texCache.get(file);
   };
 
@@ -246,7 +248,7 @@ export async function buildSystem(scene) {
     } else {
       const map = await loadBodyTex(def.tex);
       const normal = ROCKY.has(def.id)
-        ? await makeNormalMap('/tex/' + def.tex, { width: 1024, strength: 1.25 })
+        ? await makeNormalMap(map, { width: 1024, strength: 1.25 })
         : null;
       mat = makeSurfaceMaterial({
         map,
@@ -264,6 +266,9 @@ export async function buildSystem(scene) {
           ? { normal: new THREE.Vector3(0, 1, 0), inner: radius * RING_IN, outer: radius * RING_OUT, dark: 0.52, map: ringTex }
           : null,
       });
+      // 法线是由（低清）反照率实时算的，高清贴图到位后必须重算一遍，
+      // 否则整颗星球的浮雕都停在 512 宽的分辨率上。
+      if (normal) mat.userData.normalSrc = { width: 1024, strength: 1.25 };
     }
 
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 160, 120), mat);
@@ -351,7 +356,7 @@ export async function buildSystem(scene) {
     group.add(tilt);
 
     // 法线贴图跟着球面细分一起提：1024 宽在 2.6R 处每个 texel 已经跨好几个像素
-    const moonNormal = moonTex ? await makeNormalMap('/tex/moon_4k.webp', { width: 2048, strength: 1.1 }) : null;
+    const moonNormal = moonTex ? await makeNormalMap(moonTex, { width: 2048, strength: 1.1 }) : null;
     const mat = makeSurfaceMaterial({
       map: moonTex,
       normalMap: moonNormal,
@@ -363,6 +368,7 @@ export async function buildSystem(scene) {
       grazing: 0.30,
       limb: LIMB.moon,
     });
+    if (moonNormal) mat.userData.normalSrc = { width: 2048, strength: 1.1 };
     // 月球是全场唯一会被推到 2.6 个半径处的天体，96 段在这个距离下轮廓是多边形
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 160, 120), mat);
     tilt.add(mesh);

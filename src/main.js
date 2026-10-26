@@ -4,6 +4,7 @@ import './style.css';
 import { createRenderer, createComposer } from './core/renderer.js';
 import { bakeGalaxy, createStars } from './core/sky.js';
 import { buildSystem } from './scene/system.js';
+import { upgradeRoot } from './core/textures.js';
 import { Rig, MIN_DIST } from './core/camera.js';
 import { Clock } from './core/clock.js';
 import { Labels } from './ui/labels.js';
@@ -102,6 +103,10 @@ async function boot() {
 
   bindInteraction();
   loop();
+
+  // 首屏出来之后 1.8 秒再开始补高清：先让开场动画跑顺，
+  // 别在用户看第一眼的时候就占满带宽。
+  setTimeout(() => { warmTextures(); }, 1800);
 }
 
 function nextFrame() {
@@ -142,9 +147,32 @@ function pickAt(x, y, threshold = 46) {
   return best;
 }
 
+// 高清贴图的补全顺序：按"用户最可能点开"排。
+// 全景时所有行星只有几个像素，512 宽的低清层完全够用；
+// 高清只有在镜头真的推上去之后才有意义。
+const TEX_ORDER = ['earth', 'moon', 'saturn', 'jupiter', 'mars', 'mercury', 'venus', 'uranus', 'neptune'];
+const texBusy = new Set();
+
+function upgradeBody(id) {
+  const b = system.bodies.get(id);
+  if (!b || !b.group || texBusy.has(id)) return;
+  texBusy.add(id);
+  upgradeRoot(b.group).catch(() => {});
+}
+
+async function warmTextures() {
+  for (const id of TEX_ORDER) {
+    upgradeBody(id);
+    // 一次只推一颗，别和用户接下来的操作抢带宽
+    while (texBusy.has(id)) await new Promise(r => setTimeout(r, 120));
+  }
+}
+
 function focusBody(b, dur = 1.5) {
   if (!b) return;
   state.focusId = b.id;
+  // 用户已经点开了，就别等后台排队
+  upgradeBody(b.id);
   const isSun = b.id === 'sun';
   const portrait = window.innerWidth <= 860;
   const GAS = { jupiter: 5.4, saturn: 5.8, uranus: 6.2, neptune: 6.2 };
