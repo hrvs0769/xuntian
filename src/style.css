@@ -1,0 +1,669 @@
+/* 巡天 · 太阳系 — interface
+   语言：冷白墨、极细线、单色强调；一切为画面让路。 */
+
+:root {
+  --ink: #e9eff8;
+  --ink-dim: rgba(233, 239, 248, 0.58);
+  --ink-faint: rgba(233, 239, 248, 0.3);
+  --ink-ghost: rgba(233, 239, 248, 0.14);
+  --line: rgba(233, 239, 248, 0.13);
+  --line-soft: rgba(233, 239, 248, 0.07);
+  --accent: #ffb765;
+  --accent-dim: rgba(255, 183, 101, 0.5);
+  --glass: rgba(10, 14, 22, 0.62);
+
+  --serif: "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", "SimSun", serif;
+  --sans: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --mono: "SF Mono", "SFMono-Regular", "Roboto Mono", Menlo, Consolas, monospace;
+
+  --pad: clamp(18px, 3.2vw, 44px);
+  --bar: clamp(56px, 8.4vh, 78px);
+  --ease: cubic-bezier(0.22, 0.68, 0.24, 1);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  width: 100%; height: 100%;
+  margin: 0; padding: 0;
+  overflow: hidden;
+  background: #04060a;
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button:focus-visible { outline: 1px solid var(--accent-dim); outline-offset: 6px; }
+::selection { background: rgba(255, 183, 101, 0.3); }
+
+#gl {
+  position: fixed; inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+}
+
+/* ───────────────────────── 标签层 ───────────────────────── */
+
+#labels {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 2;
+}
+
+.lbl {
+  position: absolute;
+  left: 0; top: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  pointer-events: none;
+  will-change: transform, opacity;
+  transition: opacity 0.45s var(--ease);
+}
+
+.lbl-dot {
+  width: 3px; height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.9;
+  flex: none;
+}
+
+.lbl-text {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  text-shadow: 0 0 14px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.8);
+}
+
+.lbl-en {
+  font-family: var(--mono);
+  font-size: 7.5px;
+  letter-spacing: 0.2em;
+  opacity: 0.42;
+  margin-left: 1px;
+  padding-top: 1px;
+}
+
+.lbl.is-major .lbl-text { font-size: 12.5px; letter-spacing: 0.2em; }
+
+/* ───────────────────────── 界面层 ───────────────────────── */
+
+#ui {
+  position: fixed; inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.2s var(--ease);
+}
+#ui.is-live { opacity: 1; }
+#ui > * { pointer-events: auto; }
+
+body.is-hidden-ui #ui { opacity: 0; pointer-events: none; }
+body.is-hidden-ui #labels { opacity: 0; }
+
+/* 品牌 */
+#brand {
+  position: absolute;
+  top: calc(var(--pad) * 0.86);
+  left: var(--pad);
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  pointer-events: none;
+}
+.brand-mark {
+  font-family: var(--serif);
+  font-size: 15px;
+  letter-spacing: 0.32em;
+  color: var(--ink);
+  opacity: 0.92;
+}
+.brand-sub {
+  font-family: var(--mono);
+  font-size: 7.5px;
+  letter-spacing: 0.34em;
+  color: var(--ink-faint);
+}
+
+/* 视角切换：全景 / 内太阳系
+   全景里水星到火星挤在太阳光晕内不到 12px，彼此的可点击区域完全重叠，
+   点谁都可能点到别的那颗。内太阳系把这个范围放大 20 倍，四颗行星才散得开。 */
+#views {
+  position: absolute;
+  top: calc(var(--pad) * 0.86 + 24px);
+  left: var(--pad);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#views button {
+  padding: 2px 0;
+  border: 0; background: none;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  color: var(--ink-faint);
+  cursor: pointer;
+  transition: color 0.35s var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+#views button:hover { color: var(--ink-dim); }
+#views button.is-on { color: var(--ink); }
+#views button.is-on::after {
+  content: "";
+  display: block;
+  height: 1px;
+  margin-top: 3px;
+  background: var(--accent-dim);
+}
+#views i {
+  width: 10px; height: 1px;
+  background: var(--line);
+}
+
+/* 黑场遮罩（开场用） */
+#veil {
+  position: fixed;
+  inset: 0;
+  background: #04060a;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 1;
+  will-change: opacity;
+}
+
+/* 开场标题：左下角竖排式文本块，把右半屏完整让给地球 */
+#intro {
+  position: fixed;
+  left: var(--pad);
+  bottom: calc(var(--bar) + 7vh);
+  max-width: min(46vw, 520px);
+  text-align: left;
+  pointer-events: none;
+  z-index: 6;
+  opacity: 0;
+  transition: opacity 1.4s var(--ease);
+  will-change: opacity;
+}
+#intro.is-on { opacity: 1; }
+#intro.is-out { opacity: 0; transition-duration: 1.0s; }
+
+.intro-kicker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 clamp(14px, 2.2vh, 22px);
+  font-size: clamp(10px, 1.02vw, 12px);
+  letter-spacing: 0.24em;
+  color: var(--ink-dim);
+}
+.intro-kicker i {
+  display: block;
+  width: clamp(22px, 3.4vw, 44px);
+  height: 1px;
+  background: linear-gradient(90deg, var(--accent), rgba(255, 183, 101, 0));
+  opacity: 0.75;
+}
+
+.intro-title {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(54px, 8.2vw, 118px);
+  line-height: 1.0;
+  letter-spacing: 0.20em;
+  margin: 0;
+  padding-left: 0.02em;
+  color: #f7faff;
+  text-shadow: 0 0 70px rgba(150, 190, 255, 0.28), 0 0 160px rgba(110, 160, 255, 0.14);
+}
+
+.intro-sub {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: clamp(16px, 2.6vh, 26px) 0 0;
+  font-family: var(--mono);
+  font-size: clamp(7.5px, 0.82vw, 9.5px);
+  letter-spacing: 0.54em;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.intro-sub::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  min-width: 30px;
+  background: linear-gradient(90deg, var(--line), transparent);
+}
+
+/* 逐行浮起 */
+@keyframes introRise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+#intro.is-on .intro-kicker { animation: introRise 1.5s var(--ease) 0.45s both; }
+/* 调试定格：直接落到终态，不重播动画 */
+#intro.is-static .intro-kicker,
+#intro.is-static .intro-title,
+#intro.is-static .intro-sub { animation: none !important; opacity: 1; transform: none; }
+#intro.is-on .intro-title  { animation: introRise 1.9s var(--ease) 0.62s both; }
+#intro.is-on .intro-sub    { animation: introRise 1.5s var(--ease) 0.95s both; }
+
+/* 首次提示 */
+#hint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--bar) + 30px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--ink-faint);
+  pointer-events: none;
+  transition: opacity 1.2s var(--ease);
+  white-space: nowrap;
+}
+#hint i {
+  width: 2px; height: 2px;
+  border-radius: 50%;
+  background: var(--ink-ghost);
+}
+#hint.is-hidden { opacity: 0; }
+
+/* ───────────────────────── 天体面板 ───────────────────────── */
+
+#panel {
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: clamp(268px, 25vw, 340px);
+  padding: clamp(72px, 11vh, 118px) var(--pad) calc(var(--bar) + 28px);
+  background: linear-gradient(90deg, rgba(6, 9, 14, 0) 0%, rgba(6, 9, 14, 0.72) 22%, rgba(6, 9, 14, 0.9) 100%);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  border-left: 1px solid var(--line-soft);
+  transform: translateX(12px);
+  opacity: 0;
+  transition: opacity 0.55s var(--ease), transform 0.55s var(--ease);
+  pointer-events: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+#panel.is-open {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+#panel.is-hidden { display: none; }
+
+#panel-close {
+  position: absolute;
+  top: calc(var(--pad) * 0.86);
+  right: var(--pad);
+  color: var(--ink-faint);
+  padding: 6px;
+  transition: color 0.3s;
+}
+#panel-close:hover { color: var(--ink); }
+
+.panel-eyebrow {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 7.5px;
+  letter-spacing: 0.3em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+#panel-name {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(30px, 3.1vw, 40px);
+  letter-spacing: 0.16em;
+  margin: 22px 0 0;
+  line-height: 1.1;
+}
+
+#panel-en {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.34em;
+  color: var(--ink-faint);
+  margin: 9px 0 0;
+}
+
+#panel-line {
+  font-size: 12.5px;
+  line-height: 1.95;
+  letter-spacing: 0.06em;
+  color: var(--ink-dim);
+  margin: 22px 0 0;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+#panel-data {
+  margin: 0;
+  padding: 4px 0 0;
+}
+#panel-data .row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+#panel-data dt {
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  color: var(--ink-faint);
+  font-weight: 400;
+}
+#panel-data dd {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  margin: 0;
+  text-align: right;
+}
+#panel-data dd em {
+  font-style: normal;
+  color: var(--ink-faint);
+  font-size: 9.5px;
+  margin-left: 4px;
+}
+
+/* ───────────────────────── 时间轴 ───────────────────────── */
+
+#timebar {
+  z-index: 3;
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: var(--bar);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: clamp(14px, 2.4vw, 34px);
+  padding: 0 var(--pad);
+  background: linear-gradient(0deg, rgba(4, 6, 10, 0.82) 0%, rgba(4, 6, 10, 0.34) 62%, rgba(4, 6, 10, 0) 100%);
+  opacity: 0.62;
+  transition: opacity 0.5s var(--ease);
+}
+#timebar:hover, #timebar.is-active { opacity: 1; }
+
+.tb-left, .tb-right { display: flex; align-items: center; gap: 12px; }
+.tb-right { justify-content: flex-end; }
+
+.tb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px; height: 26px;
+  color: var(--ink-dim);
+  border-radius: 50%;
+  transition: color 0.25s, background 0.25s;
+}
+.tb-btn:hover { color: var(--ink); background: rgba(233, 239, 248, 0.06); }
+.tb-text {
+  width: auto;
+  padding: 0 8px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  border-radius: 3px;
+}
+
+#tb-play .ic-pause { display: none; }
+#tb-play.is-playing .ic-play { display: none; }
+#tb-play.is-playing .ic-pause { display: block; }
+
+.tb-track {
+  position: relative;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+}
+.tb-rail {
+  position: absolute;
+  left: 0; right: 0;
+  height: 1px;
+  background: var(--line);
+}
+.tb-fill {
+  position: absolute;
+  left: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 183, 101, 0.18), var(--accent-dim));
+  pointer-events: none;
+}
+.tb-knob {
+  position: absolute;
+  width: 7px; height: 7px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(255, 183, 101, 0.7);
+  pointer-events: none;
+  transition: transform 0.18s var(--ease);
+}
+.tb-track:hover .tb-knob { transform: scale(1.5); }
+.tb-ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.tb-tick {
+  position: absolute;
+  top: 50%;
+  width: 1px; height: 5px;
+  margin-top: -2.5px;
+  background: rgba(233, 239, 248, 0.2);
+}
+.tb-tick span {
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.1em;
+  color: var(--ink-ghost);
+  white-space: nowrap;
+}
+
+.tb-readout {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  min-width: 92px;
+}
+#tb-date {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.09em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+#tb-rate {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--ink-faint);
+}
+
+.tb-rates { display: flex; gap: 2px; }
+.rate-chip {
+  padding: 4px 7px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  border-radius: 3px;
+  transition: color 0.22s, background 0.22s;
+  font-variant-numeric: tabular-nums;
+}
+.rate-chip:hover { color: var(--ink); }
+.rate-chip.is-on { color: var(--accent); background: rgba(255, 183, 101, 0.08); }
+
+/* ───────────────────────── 加载 ───────────────────────── */
+
+#loader {
+  position: fixed; inset: 0;
+  z-index: 10;
+  background: #04060a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 1.1s var(--ease);
+}
+#loader.is-gone { opacity: 0; pointer-events: none; }
+
+.loader-inner { text-align: center; width: 210px; }
+.loader-name {
+  font-family: var(--serif);
+  font-size: 17px;
+  letter-spacing: 0.5em;
+  text-indent: 0.5em;
+  color: var(--ink);
+  opacity: 0.86;
+  margin-bottom: 26px;
+}
+.loader-bar {
+  height: 1px;
+  background: rgba(233, 239, 248, 0.1);
+  overflow: hidden;
+}
+.loader-bar i {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, rgba(255, 183, 101, 0.3), var(--accent));
+  transition: width 0.4s var(--ease);
+}
+.loader-note {
+  margin-top: 16px;
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  color: var(--ink-faint);
+}
+
+/* ───────────────────────── 移动端 ───────────────────────── */
+
+@media (max-width: 860px) {
+  :root {
+    --bar: 62px;
+    --pad: 16px;
+  }
+
+  #brand { top: 14px; }
+  .brand-mark { font-size: 13px; letter-spacing: 0.26em; }
+  .brand-sub { display: none; }
+
+  #intro { max-width: 84vw; bottom: calc(var(--bar) + 5vh); }
+  .intro-title { font-size: clamp(46px, 15.4vw, 80px); letter-spacing: 0.16em; }
+  .intro-sub { letter-spacing: 0.42em; }
+  .intro-kicker { letter-spacing: 0.18em; }
+
+  #panel {
+    top: auto;
+    left: 0; right: 0;
+    width: 100%;
+    max-height: 46vh;
+    z-index: 2;
+    padding: 18px var(--pad) calc(var(--bar) + 18px);
+    background: linear-gradient(0deg, rgba(5, 8, 13, 0.985) 0%, rgba(5, 8, 13, 0.95) 78%, rgba(5, 8, 13, 0.55) 100%);
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    transform: translateY(16px);
+    -webkit-overflow-scrolling: touch;
+  }
+  #panel.is-open { transform: none; }
+  #panel-close { top: 12px; right: 12px; }
+  .panel-eyebrow { padding-bottom: 10px; }
+  #panel-name { font-size: 23px; margin-top: 12px; letter-spacing: 0.12em; }
+  #panel-en { margin-top: 6px; }
+  #panel-line { font-size: 11.5px; line-height: 1.85; margin-top: 12px; padding-bottom: 12px; }
+  #panel-data .row { padding: 6px 0; }
+  #panel-data .row dt { font-size: 9.5px; }
+  #panel-data .row dd { font-size: 10.5px; }
+
+  #timebar {
+    grid-template-columns: auto 1fr;
+    grid-template-areas: "left track" "right right";
+    row-gap: 0;
+    padding: 0 14px;
+    height: calc(var(--bar) + 6px);
+  }
+  .tb-left { grid-area: left; gap: 4px; }
+  .tb-track { grid-area: track; }
+  .tb-right { grid-area: right; justify-content: space-between; padding-bottom: 8px; }
+  .tb-readout { flex-direction: row; align-items: baseline; gap: 8px; min-width: 0; }
+  .tb-rates { gap: 0; }
+  .rate-chip { padding: 3px 5px; font-size: 8.5px; }
+  #hint { bottom: calc(var(--bar) + 24px); font-size: 10px; gap: 10px; }
+}
+
+@media (max-width: 400px) {
+  .rate-chip:nth-child(n+5) { display: none; }
+}
+
+/* ───────────────────────── 沉浸模式 ─────────────────────────
+   按钮必须活在 #ui 之外：#ui 在沉浸模式下整体 opacity:0，
+   按钮跟着一起消失的话，就没有任何鼠标入口能退出来了。 */
+#immersive {
+  position: fixed;
+  top: calc(var(--pad) * 0.86);
+  right: var(--pad);
+  z-index: 12;
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  padding: 0; margin: 0;
+  border: 0; background: none;
+  color: var(--ink-faint);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.7s var(--ease), color 0.25s var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+#immersive svg { display: block; }
+#immersive .ic-out { display: none; }
+
+#ui.is-live ~ #immersive { opacity: 0.5; pointer-events: auto; }
+#immersive:hover { color: var(--ink); }
+
+body.is-hidden-ui #immersive { opacity: 0.26; pointer-events: auto; }
+body.is-hidden-ui #immersive:hover { opacity: 0.8; }
+body.is-hidden-ui #immersive .ic-in { display: none; }
+body.is-hidden-ui #immersive .ic-out { display: block; }
+
+/* 资料面板打开时右上角归它，按钮让位。
+   这里必须带上 #ui.is-live ~ #immersive 这一串：
+   ID 选择器的优先级高于 body.has-panel，只写后者会被上面那条盖掉。 */
+body.has-panel #ui.is-live ~ #immersive,
+body.has-panel #immersive { opacity: 0; pointer-events: none; }
+
+@media (max-width: 860px) {
+  #immersive { top: 12px; right: 12px; width: 26px; height: 26px; }
+  #views { top: 38px; gap: 8px; }
+  #views button { font-size: 9.5px; letter-spacing: 0.14em; }
+}
+

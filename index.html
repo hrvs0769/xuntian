@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#04060a">
+<title>太阳系 · 巡天</title>
+<meta name="description" content="一个可以亲手拨动时间的太阳系：真实星历、真实比例、真实光影。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='6' fill='%23ffd9a0'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23ffb765' stroke-opacity='.55' stroke-width='1'/%3E%3Cellipse cx='16' cy='16' rx='14' ry='5.4' fill='none' stroke='%23e9eff8' stroke-opacity='.42' stroke-width='1' transform='rotate(-24 16 16)'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+
+<canvas id="gl"></canvas>
+<div id="labels" aria-hidden="true"></div>
+
+<div id="veil"></div>
+
+<div id="intro">
+  <p class="intro-kicker"><i></i>在这里，一秒可以是一年</p>
+  <h1 class="intro-title">太阳系</h1>
+  <p class="intro-sub">THE&nbsp;SOLAR&nbsp;SYSTEM</p>
+</div>
+
+<div id="ui">
+
+  <header id="brand">
+    <span class="brand-mark">巡天</span>
+    <span class="brand-sub">SOLAR&nbsp;SYSTEM</span>
+  </header>
+
+  <nav id="views" aria-label="视角">
+    <button data-view="wide" class="is-on">全景</button>
+    <i></i>
+    <button data-view="inner">内太阳系</button>
+  </nav>
+
+  <div id="hint" class="is-hidden">
+    <span>滚动 缩放</span><i></i><span>拖动 环绕</span><i></i><span>点击 前往</span>
+  </div>
+
+  <aside id="panel" class="is-hidden" aria-live="polite">
+    <button id="panel-close" aria-label="关闭">
+      <svg viewBox="0 0 24 24" width="14" height="14"><path d="M5 5l14 14M19 5L5 19" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+    </button>
+    <div class="panel-eyebrow"><span id="panel-kind">行星</span><span id="panel-index"></span></div>
+    <h2 id="panel-name">地球</h2>
+    <p id="panel-en">EARTH</p>
+    <p id="panel-line"></p>
+    <dl id="panel-data"></dl>
+  </aside>
+
+  <footer id="timebar">
+    <div class="tb-left">
+      <button id="tb-play" class="tb-btn" aria-label="播放/暂停">
+        <svg class="ic-play" viewBox="0 0 24 24" width="13" height="13"><path d="M8 5l11 7-11 7z" fill="currentColor"/></svg>
+        <svg class="ic-pause" viewBox="0 0 24 24" width="13" height="13"><path d="M7 4h3.4v16H7zM13.6 4H17v16h-3.4z" fill="currentColor"/></svg>
+      </button>
+      <button id="tb-now" class="tb-btn tb-text" aria-label="回到现在">此刻</button>
+    </div>
+
+    <div class="tb-track" id="tb-track">
+      <div class="tb-rail"></div>
+      <div class="tb-fill" id="tb-fill"></div>
+      <div class="tb-knob" id="tb-knob"></div>
+      <div class="tb-ticks" id="tb-ticks"></div>
+    </div>
+
+    <div class="tb-right">
+      <div class="tb-readout">
+        <span id="tb-date">2026.10.25</span>
+        <span id="tb-rate">1 秒 = 1 天</span>
+      </div>
+      <div class="tb-rates" id="tb-rates"></div>
+    </div>
+  </footer>
+
+</div>
+
+<button id="immersive" aria-label="沉浸模式" title="沉浸模式（H）">
+  <svg class="ic-in" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M4 9.5V4h5.5M20 9.5V4h-5.5M4 14.5V20h5.5M20 14.5V20h-5.5"/></svg>
+  <svg class="ic-out" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M9.5 4v5.5H4M14.5 4v5.5H20M9.5 20v-5.5H4M14.5 20v-5.5H20"/></svg>
+</button>
+
+<div id="loader">
+  <div class="loader-inner">
+    <div class="loader-name">巡天</div>
+    <div class="loader-bar"><i id="loader-fill"></i></div>
+    <div class="loader-note" id="loader-note">正在点亮太阳</div>
+  </div>
+</div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
